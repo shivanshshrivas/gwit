@@ -1,3 +1,7 @@
+// Node stdlib
+import * as fs from 'fs'
+import * as path from 'path'
+
 // External packages
 import { Command } from 'commander'
 
@@ -14,12 +18,16 @@ import { syncCommand } from './commands/sync'
 
 // ─── Commands ─────────────────────────────────────────────────────────────────
 
+const pkg = JSON.parse(
+  fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf-8')
+) as { version: string }
+
 const program = new Command()
 
 program
   .name('gwit')
   .description('Fully isolated git worktrees for parallel development')
-  .version('0.1.0')
+  .version(pkg.version)
 
 // Default command: gwit [branch]
 program

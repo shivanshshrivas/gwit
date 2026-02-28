@@ -1,6 +1,6 @@
 {
   "name": "@shivanshshrivas/gwit",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Fully isolated git worktrees for parallel development",
   "license": "MIT",
   "engines": {
