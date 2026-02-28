@@ -154,10 +154,7 @@ describe('gwit lifecycle — create → sync → open → remove', () => {
 
   it('re-copies .gwitinclude files when sync is called', () => {
     // Simulate an .env change in the main worktree
-    fs.writeFileSync(
-      path.join(REPO_DIR, '.env'),
-      'PORT=3000\nDB_NAME=myapp\nNEW_KEY=injected\n'
-    )
+    fs.writeFileSync(path.join(REPO_DIR, '.env'), 'PORT=3000\nDB_NAME=myapp\nNEW_KEY=injected\n')
 
     syncCommand(BRANCH)
 
