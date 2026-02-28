@@ -29,14 +29,16 @@ const TERMINAL_EDITORS = new Set(['vim', 'nvim', 'vi', 'nano', 'emacs'])
 export function launchEditor(editor: string, worktreePath: string): void {
   if (TERMINAL_EDITORS.has(editor)) {
     // Block until the user quits the terminal editor
-    spawnSync(editor, [worktreePath], { stdio: 'inherit' })
+    spawnSync(editor, [worktreePath], { stdio: 'inherit', shell: true })
     return
   }
 
   // GUI editor: fire-and-forget, do not hold the process open
+  // shell: true is required on Windows where editors like 'code' are .cmd scripts
   const child = spawn(editor, [worktreePath], {
     detached: true,
     stdio: 'ignore',
+    shell: true,
   })
 
   child.on('error', () => {
