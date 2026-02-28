@@ -1,0 +1,22 @@
+# Source and tests — not needed in the published package.
+# The package.json "files" field already restricts to dist/ only;
+# this file makes the intent explicit.
+
+src/
+tests/
+docs/
+
+# Internal / AI tooling
+.claude/
+.private/
+
+# Build config
+tsconfig.json
+tsup.config.ts
+vitest.config.ts
+.eslintrc.cjs
+.prettierrc
+
+# Dev artifacts
+*.tsbuildinfo
+coverage/
