@@ -118,6 +118,14 @@ export function branchExistsRemote(branch: string): boolean {
 }
 
 /**
+ * Fetches all refs from the origin remote so that DWIM branch tracking works
+ * when creating a worktree for a remote-only branch.
+ */
+export function fetchOrigin(): void {
+  runArgsInherited('git', ['fetch', 'origin'])
+}
+
+/**
  * Creates a new linked worktree at the given path.
  * Uses argument arrays throughout to prevent shell injection.
  *

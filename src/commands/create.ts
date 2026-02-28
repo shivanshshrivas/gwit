@@ -9,6 +9,7 @@ import {
   branchExistsLocal,
   branchExistsRemote,
   worktreeExistsForBranch,
+  fetchOrigin,
   addWorktree,
 } from '../core/git'
 import { ensureConfig } from '../core/config'
@@ -94,6 +95,13 @@ export async function createCommand(branch: string, options: CreateOptions): Pro
   }
 
   assertBranchResolvable(branch, isNew)
+
+  // ── Fetch remote refs so git worktree DWIM can set up tracking ──────────
+
+  if (!isNew && !branchExistsLocal(branch)) {
+    ui.step('Fetching from origin…')
+    fetchOrigin()
+  }
 
   // ── Config & path resolution ──────────────────────────────────────────────
 
