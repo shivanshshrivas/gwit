@@ -9,7 +9,7 @@ Built for parallel development with multiple branches and AI coding agents - no 
 ## Install
 
 ```sh
-npm install -g gwit
+npm install -g @shivanshshrivas/gwit
 ```
 
 Requires **Node.js >= 20** and **git >= 2.5**.
