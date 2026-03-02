@@ -2,12 +2,24 @@
   "name": "@shivanshshrivas/gwit",
   "version": "0.2.0",
   "description": "Fully isolated git worktrees for parallel development",
+  "keywords": [
+    "git",
+    "git-worktree",
+    "worktree",
+    "cli",
+    "developer-tools",
+    "typescript",
+    "parallel-development",
+    "monorepo",
+    "automation",
+    "ai-agents"
+  ],
   "license": "MIT",
   "engines": {
     "node": ">=20.0.0"
   },
   "bin": {
-    "gwit": "./dist/index.cjs"
+    "gwit": "dist/index.cjs"
   },
   "files": [
     "dist"

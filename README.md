@@ -1,5 +1,11 @@
 # gwit
 
+[![npm version](https://img.shields.io/npm/v/%40shivanshshrivas%2Fgwit)](https://www.npmjs.com/package/@shivanshshrivas/gwit)
+[![npm downloads](https://img.shields.io/npm/dm/%40shivanshshrivas%2Fgwit)](https://www.npmjs.com/package/@shivanshshrivas/gwit)
+[![CI](https://img.shields.io/github/actions/workflow/status/shivanshshrivas/gwit/ci.yml?branch=main&label=ci)](https://github.com/shivanshshrivas/gwit/actions/workflows/ci.yml)
+[![Node >=20](https://img.shields.io/badge/node-%3E%3D20-339933)](https://nodejs.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](./LICENSE)
+
 Fully isolated git worktrees, in one command.
 
 gwit wraps `git worktree` to turn a fresh checkout into a fully working environment - gitignored files copied, unique port assigned, per-worktree env vars injected, and setup scripts run automatically.
