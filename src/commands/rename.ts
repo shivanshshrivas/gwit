@@ -2,18 +2,9 @@ import { GwitError } from '../types'
 import { ui } from '../lib/ui'
 import { toSlug } from '../lib/slug'
 import { getWorktreePath } from '../lib/paths'
-import {
-  isGitRepo,
-  getMainWorktreePath,
-  renameBranch,
-  moveWorktree,
-} from '../core/git'
+import { isGitRepo, getMainWorktreePath, renameBranch, moveWorktree } from '../core/git'
 import { loadConfig } from '../core/config'
-import {
-  getWorktreeEntry,
-  removeWorktreeEntry,
-  addWorktreeEntry,
-} from '../core/registry'
+import { getWorktreeEntry, removeWorktreeEntry, addWorktreeEntry } from '../core/registry'
 
 // ─── Command ──────────────────────────────────────────────────────────────────
 

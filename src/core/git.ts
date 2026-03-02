@@ -202,7 +202,7 @@ export function getDefaultBranch(): string {
 
   throw new GwitError(
     'Could not determine the default branch.',
-    "Specify the target explicitly: gwit merge <branch> --into main"
+    'Specify the target explicitly: gwit merge <branch> --into main'
   )
 }
 

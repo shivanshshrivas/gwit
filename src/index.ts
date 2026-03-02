@@ -22,9 +22,9 @@ import { renameCommand } from './commands/rename'
 
 // ─── Commands ─────────────────────────────────────────────────────────────────
 
-const pkg = JSON.parse(
-  fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf-8')
-) as { version: string }
+const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf-8')) as {
+  version: string
+}
 
 const program = new Command()
 
