@@ -30,6 +30,15 @@ vi.mock('../../src/core/editor', () => ({
 
 vi.mock('../../src/core/files', () => ({
   copyIncludedFiles: vi.fn(),
+  reverseCopyIncludedFiles: vi.fn(),
+}))
+
+vi.mock('../../src/core/merge', () => ({
+  mergeBackIncludedFiles: vi.fn(),
+}))
+
+vi.mock('../../src/core/snapshot', () => ({
+  readSnapshot: vi.fn(),
 }))
 
 vi.mock('../../src/lib/ui', () => ({
@@ -38,6 +47,7 @@ vi.mock('../../src/lib/ui', () => ({
     success: vi.fn(),
     info: vi.fn(),
     dim: vi.fn(),
+    warn: vi.fn(),
     error: vi.fn(),
     bold: vi.fn((s: string) => s),
   },
@@ -50,7 +60,9 @@ import { isGitRepo, getMainWorktreePath, getRepoRoot, listWorktrees } from '../.
 import { getWorktreeEntry } from '../../src/core/registry'
 import { loadConfig } from '../../src/core/config'
 import { launchEditor } from '../../src/core/editor'
-import { copyIncludedFiles } from '../../src/core/files'
+import { copyIncludedFiles, reverseCopyIncludedFiles } from '../../src/core/files'
+import { mergeBackIncludedFiles } from '../../src/core/merge'
+import { readSnapshot } from '../../src/core/snapshot'
 import { ui } from '../../src/lib/ui'
 
 // ─── Typed mock aliases ────────────────────────────────────────────────────────
@@ -63,6 +75,9 @@ const mockGetWorktreeEntry = vi.mocked(getWorktreeEntry)
 const mockLoadConfig = vi.mocked(loadConfig)
 const mockLaunchEditor = vi.mocked(launchEditor)
 const mockCopyIncludedFiles = vi.mocked(copyIncludedFiles)
+const mockReverseCopyIncludedFiles = vi.mocked(reverseCopyIncludedFiles)
+const mockMergeBackIncludedFiles = vi.mocked(mergeBackIncludedFiles)
+const mockReadSnapshot = vi.mocked(readSnapshot)
 const mockExistsSync = vi.mocked(fs.existsSync)
 const mockUi = vi.mocked(ui)
 
@@ -139,6 +154,19 @@ describe('syncCommand', () => {
     mockListWorktrees.mockReturnValue([{ path: ENTRY_PATH, head: 'abc123', branch: 'feature' }])
     mockGetWorktreeEntry.mockReturnValue(stubEntry)
     mockCopyIncludedFiles.mockReturnValue([])
+    mockReverseCopyIncludedFiles.mockReturnValue([])
+    mockMergeBackIncludedFiles.mockReturnValue({
+      copied: [],
+      merged: [],
+      conflicts: [],
+      skipped: [],
+      binarySkipped: [],
+    })
+    mockReadSnapshot.mockReturnValue({
+      branch: 'feature',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      files: {},
+    })
     mockExistsSync.mockReturnValue(true)
   })
 
@@ -200,5 +228,22 @@ describe('syncCommand', () => {
     mockCopyIncludedFiles.mockReturnValue([])
     syncCommand('feature')
     expect(mockUi.info).toHaveBeenCalledWith(expect.stringContaining('Nothing to sync'))
+  })
+
+  it('uses snapshot-based three-way merge when --back is enabled and snapshot exists', () => {
+    syncCommand('feature', { back: true })
+    expect(mockMergeBackIncludedFiles).toHaveBeenCalledWith(ENTRY_PATH, MAIN_PATH, 'feature')
+    expect(mockReverseCopyIncludedFiles).not.toHaveBeenCalled()
+  })
+
+  it('falls back to direct reverse copy when --back is enabled but snapshot is missing', () => {
+    mockReadSnapshot.mockReturnValue(undefined)
+    mockReverseCopyIncludedFiles.mockReturnValue(['.env'])
+
+    syncCommand('feature', { back: true })
+
+    expect(mockMergeBackIncludedFiles).not.toHaveBeenCalled()
+    expect(mockReverseCopyIncludedFiles).toHaveBeenCalledWith(ENTRY_PATH, MAIN_PATH)
+    expect(mockUi.warn).toHaveBeenCalledWith(expect.stringContaining('No snapshot found'))
   })
 })
