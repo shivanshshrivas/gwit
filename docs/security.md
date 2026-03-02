@@ -392,7 +392,7 @@ breaking changes.
 If you discover a security issue in gwit, please report it responsibly:
 
 1. **Do not** open a public GitHub issue for security vulnerabilities.
-2. Open a [GitHub Security Advisory](https://github.com/shriv/gwit/security/advisories/new)
+2. Open a [GitHub Security Advisory](https://github.com/shivanshshrivas/gwit/security/advisories/new)
    on the repository, or email the maintainer directly if you cannot find a contact.
 3. Include: affected version, steps to reproduce, impact assessment, and a suggested
    fix if you have one.

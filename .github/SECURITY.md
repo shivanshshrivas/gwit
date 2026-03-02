@@ -45,4 +45,4 @@ The following are **not** in scope:
 
 ## Security Architecture
 
-For a detailed threat model and security controls, see [docs/security.md](https://github.com/shriv/gwit/blob/main/docs/security.md).
+For a detailed threat model and security controls, see [docs/security.md](https://github.com/shivanshshrivas/gwit/blob/main/docs/security.md).
