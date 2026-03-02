@@ -20,6 +20,23 @@ export function getRegistryPath(): string {
 }
 
 /**
+ * Returns the snapshots directory path: `~/.gwit/snapshots`.
+ * @returns Absolute path to the snapshots directory.
+ */
+export function getSnapshotsDir(): string {
+  return path.join(getGwitDir(), 'snapshots')
+}
+
+/**
+ * Returns the snapshot directory path for a worktree slug.
+ * @param slug - Worktree slug (filesystem-safe branch identifier).
+ * @returns Absolute path to the snapshot directory for the slug.
+ */
+export function getSnapshotDir(slug: string): string {
+  return path.join(getSnapshotsDir(), slug)
+}
+
+/**
  * Returns the global config path: `~/.gwitrc`.
  * @returns Absolute path to the config file.
  */

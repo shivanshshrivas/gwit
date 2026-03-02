@@ -109,6 +109,33 @@ export function runArgsSafe(
 }
 
 /**
+ * Same as `runArgs` but returns the process exit code instead of throwing.
+ * Useful when a non-zero code carries semantic meaning (e.g. conflict count).
+ *
+ * @param cmd - The executable to run.
+ * @param args - Arguments passed directly to the process.
+ * @param options - Optional cwd and env overrides.
+ * @returns `{ stdout, exitCode }`.
+ */
+export function runArgsWithExitCode(
+  cmd: string,
+  args: string[],
+  options?: RunOptions
+): { stdout: string; exitCode: number } {
+  const result = spawnSync(cmd, args, {
+    encoding: 'utf-8',
+    cwd: options?.cwd,
+    env: options?.env ? { ...process.env, ...options.env } : process.env,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  })
+
+  return {
+    stdout: (result.stdout ?? '').trim(),
+    exitCode: result.status ?? 1,
+  }
+}
+
+/**
  * Runs a shell command silently and returns a result object.
  * Never throws — command failures are returned as `{ success: false }`.
  *

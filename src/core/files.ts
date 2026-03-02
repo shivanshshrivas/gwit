@@ -38,7 +38,7 @@ export function _parseLines(content: string): string[] {
  * @param cwd - The repo root to run the check from.
  * @returns True if git considers the path ignored.
  */
-function isGitIgnored(entryPath: string, cwd: string): boolean {
+export function isGitIgnored(entryPath: string, cwd: string): boolean {
   return runArgsSafe('git', ['check-ignore', '-q', entryPath], { cwd }).success
 }
 
@@ -51,7 +51,7 @@ function isGitIgnored(entryPath: string, cwd: string): boolean {
  * @param cwd - The repo root to run the check from.
  * @returns True if git is tracking the path.
  */
-function isGitTracked(entryPath: string, cwd: string): boolean {
+export function isGitTracked(entryPath: string, cwd: string): boolean {
   const result = runArgsSafe('git', ['ls-files', entryPath], { cwd })
   return result.success && result.stdout.length > 0
 }
