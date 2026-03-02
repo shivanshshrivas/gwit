@@ -15,6 +15,10 @@ import { configShowCommand, configGetCommand, configSetCommand } from './command
 import { initCommand } from './commands/init'
 import { openCommand } from './commands/open'
 import { syncCommand } from './commands/sync'
+import { mergeCommand } from './commands/merge'
+import { statusCommand } from './commands/status'
+import { sweepCommand } from './commands/sweep'
+import { renameCommand } from './commands/rename'
 
 // ─── Commands ─────────────────────────────────────────────────────────────────
 
@@ -100,6 +104,43 @@ program
   .description('Re-copy .gwitinclude files into an existing worktree')
   .action((branch: string | undefined) => {
     syncCommand(branch)
+  })
+
+program
+  .command('merge <branch>')
+  .description('Merge a worktree branch back into the target branch')
+  .option('--into <target>', 'Target branch (default: repo default branch)')
+  .option('--squash', 'Squash all commits into one before merging')
+  .option('--rebase', 'Rebase feature onto target, then fast-forward')
+  .option('--no-ff', 'Force a merge commit even when fast-forward is possible')
+  .option('--cleanup', 'Remove worktree after successful merge')
+  .option('--no-sync-back', 'Skip reverse-copying .gwitinclude files')
+  .action(async (branch: string, options) => {
+    await mergeCommand(branch, options)
+  })
+
+program
+  .command('status')
+  .description('Show status of all active gwit worktrees')
+  .option('--json', 'Output as JSON')
+  .action((options) => {
+    statusCommand(options)
+  })
+
+program
+  .command('sweep')
+  .description('Remove worktrees whose branches are merged')
+  .option('--dry-run', 'Show what would be removed without removing')
+  .option('--force', 'Skip confirmation prompt')
+  .action(async (options) => {
+    await sweepCommand(options)
+  })
+
+program
+  .command('rename <old-branch> <new-branch>')
+  .description('Rename a worktree branch')
+  .action(async (oldBranch: string, newBranch: string) => {
+    await renameCommand(oldBranch, newBranch)
   })
 
 // ─── Entry point ──────────────────────────────────────────────────────────────
