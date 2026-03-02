@@ -28,6 +28,7 @@ gwit -b fix/login-page        # create a new branch from HEAD
 gwit list                     # show all active worktrees
 gwit status                   # see ahead/behind, dirty state, PR info
 gwit sync feature/auth        # re-copy files after .env changes
+gwit sync --back feature/auth # three-way merge .gwitinclude files back to main
 gwit open feature/auth        # re-open editor for an existing worktree
 
 # Merge and clean up
@@ -108,12 +109,25 @@ gwit remove feature/auth --force   # skip uncommitted-changes check
 
 ### `gwit sync [branch]`
 
-Re-copy `.gwitinclude` files into an existing worktree. Use this when your `.env` gains a new key, certs rotate, or `node_modules` is updated.
+By default, re-copy `.gwitinclude` files from main into an existing worktree.  
+With `--back`, sync in the reverse direction using snapshot-aware three-way merge.
 
 ```sh
 gwit sync feature/auth   # sync a specific branch
 gwit sync                # auto-detect from current directory (when inside a worktree)
+gwit sync --back feature/auth  # three-way merge worktree -> main
+gwit sync --back               # auto-detect branch, then merge back
 ```
+
+`--back` compares three versions of each snapshot-tracked file:
+
+1. **base** - file content captured when the worktree was created
+2. **main** - current file in the main worktree
+3. **worktree** - current file in the linked worktree
+
+If both sides changed different text regions, gwit applies a clean merge.  
+If both sides changed the same region, gwit writes git-style conflict markers  
+(`<<<<<<<`, `=======`, `>>>>>>>`). Binary conflicts are skipped with a warning.
 
 ### `gwit open <branch>`
 
@@ -142,7 +156,7 @@ What it does, in order:
 
 1. Validates the worktree exists in the registry
 2. Resolves the target branch (default: repo's default branch)
-3. Reverse-copies `.gwitinclude` files from worktree back to main (unless `--no-sync-back`)
+3. Three-way syncs `.gwitinclude` files back to main (falls back to direct copy if no snapshot; unless `--no-sync-back`)
 4. Checks out the target branch in the main worktree
 5. Merges the feature branch using the chosen strategy
 6. Optionally removes the worktree (`--cleanup`)

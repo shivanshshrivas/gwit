@@ -65,6 +65,7 @@ reaching an `execSync` string interpolation.
 | `runArgs(cmd, args[])` | `spawnSync` | **No** — direct `execve` | Any command that takes user-provided data |
 | `runArgsSafe(cmd, args[])` | `spawnSync` | **No** | Same, never throws |
 | `runArgsInherited(cmd, args[])` | `spawnSync` | **No** | Output piped to terminal |
+| `runArgsWithExitCode(cmd, args[])` | `spawnSync` | **No** | Commands where non-zero exit is expected/meaningful (e.g. merge conflicts) |
 
 ### Policy
 
@@ -223,7 +224,7 @@ This is the same trust model as `npm install` (which runs `postinstall` scripts)
 If you want to create a worktree without running hook commands:
 
 ```bash
-gwit create <branch> --no-commands   # skip .gwitcommand
+gwit <branch> --no-commands   # skip .gwitcommand
 ```
 
 Cleanup hooks can be reviewed before `gwit remove` by reading `.gwitcleanup` in the
@@ -333,9 +334,13 @@ Both operations have security considerations:
 
 ### Reverse `.gwitinclude` copy
 
-`gwit merge` can copy gitignored files **from the worktree back to the main worktree**
-(the reverse of what `gwit create` does). This reverse copy applies the same three
-guards as the forward copy:
+`gwit merge` (and `gwit sync --back`) use a snapshot-aware three-way merge for
+gitignored `.gwitinclude` files when a snapshot exists. Snapshot base files are
+stored locally under `~/.gwit/snapshots/<slug>/` (owner-only directory and file
+permissions), and each merge runs `git merge-file` via `runArgsWithExitCode`.
+
+When no snapshot exists (legacy worktrees), gwit falls back to direct reverse copy
+from worktree to main. This reverse copy applies the same three guards as forward copy:
 
 1. **Absolute path rejection** — entries starting with `/` or a drive letter are skipped.
 2. **Containment check** — resolved paths must stay within the worktree root.
