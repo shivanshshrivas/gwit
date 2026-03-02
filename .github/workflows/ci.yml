@@ -36,7 +36,7 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - run: npm ci --no-fund
+      - run: npm install --no-fund
       - name: Run Prettier
         run: npm run format
       - name: Commit formatting fixes
@@ -67,7 +67,7 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - run: npm ci --no-fund
+      - run: npm install --no-fund
       - run: npm run lint
 
   format:
@@ -81,7 +81,7 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - run: npm ci --no-fund
+      - run: npm install --no-fund
       - run: npm run format:check
 
   typecheck:
@@ -95,7 +95,7 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - run: npm ci --no-fund
+      - run: npm install --no-fund
       - run: npm run typecheck
 
   test-unit:
@@ -109,7 +109,7 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - run: npm ci --no-fund
+      - run: npm install --no-fund
       - run: npm run test:unit
 
   test-integration:
@@ -127,7 +127,7 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - run: npm ci --no-fund
+      - run: npm install --no-fund
       # Integration tests create real git repos — configure git identity
       - name: Configure git identity
         run: |
@@ -146,7 +146,7 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - run: npm ci --no-fund
+      - run: npm install --no-fund
       # Fail on high or critical severity vulnerabilities
       - run: npm audit --audit-level=high
 
@@ -163,7 +163,7 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - run: npm ci --no-fund
+      - run: npm install --no-fund
 
       # Naming conventions, complexity limits, JSDoc (see eslint.maintainability.cjs)
       - name: ESLint maintainability rules
@@ -277,7 +277,7 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - run: npm ci --no-fund
+      - run: npm install --no-fund
       - run: npm run build
       # Verify the output exists and is executable
       - name: Verify build output
