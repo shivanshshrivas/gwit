@@ -1,8 +1,7 @@
 import * as fs from 'fs'
 import * as path from 'path'
 
-import type { WorktreeRegistry, WorktreeEntry } from '../types'
-import { GwitError } from '../types'
+import { type WorktreeRegistry, type WorktreeEntry, GwitError } from '../types'
 import { getRegistryPath, getGwitDir } from '../lib/paths'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -12,7 +11,11 @@ const RETRY_DELAY_MS = 100
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Resolves after `ms` milliseconds. Used between write-and-rename retries. */
+/**
+ * Resolves after `ms` milliseconds. Used between write-and-rename retries.
+ * @param ms - Delay duration in milliseconds.
+ * @returns A promise that resolves after the delay.
+ */
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }

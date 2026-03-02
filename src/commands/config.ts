@@ -9,7 +9,11 @@ type ConfigKey = (typeof VALID_KEYS)[number]
 
 // ─── Sub-validators ───────────────────────────────────────────────────────────
 
-/** @returns Error message, or null if valid. */
+/**
+ * Validates the editor config value.
+ * @param value - The proposed editor command string.
+ * @returns Error message, or null if valid.
+ */
 function validateEditor(value: string): string | null {
   const trimmed = value.trim()
   if (trimmed.length === 0) return 'editor cannot be empty'
@@ -22,14 +26,22 @@ function validateEditor(value: string): string | null {
   return null
 }
 
-/** @returns Error message, or null if valid. */
+/**
+ * Validates the location config value.
+ * @param value - The proposed location string.
+ * @returns Error message, or null if valid.
+ */
 function validateLocation(value: string): string | null {
   return value === 'sibling' || value === 'subdirectory'
     ? null
     : `location must be 'sibling' or 'subdirectory'`
 }
 
-/** @returns Error message, or null if valid. */
+/**
+ * Validates the basePort config value.
+ * @param value - The proposed port number as a string.
+ * @returns Error message, or null if valid.
+ */
 function validateBasePort(value: string): string | null {
   const n = parseInt(value, 10)
   return Number.isInteger(n) && n >= 1 && n <= 65535

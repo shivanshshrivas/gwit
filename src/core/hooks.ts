@@ -2,8 +2,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { execSync } from 'child_process'
 
-import type { GwitEnvironment } from '../types'
-import { GwitError } from '../types'
+import { type GwitEnvironment, GwitError } from '../types'
 import { ui } from '../lib/ui'
 
 // ─── Constants ────────────────────────────────────────────────────────────────

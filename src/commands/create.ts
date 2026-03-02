@@ -1,5 +1,4 @@
-import type { WorktreeEntry } from '../types'
-import { GwitError } from '../types'
+import { type WorktreeEntry, GwitError } from '../types'
 import { toSlug } from '../lib/slug'
 import { getWorktreePath } from '../lib/paths'
 import { ui } from '../lib/ui'

@@ -179,3 +179,132 @@ export function isBranchMerged(branch: string, into: string): boolean {
   if (!result.success) return false
   return result.stdout.split('\n').some((line) => line.trim().replace(/^\*\s*/, '') === branch)
 }
+
+/**
+ * Detects the default branch of the repository (e.g. "main" or "master").
+ * Tries `git symbolic-ref refs/remotes/origin/HEAD` first, then falls back
+ * to checking if "main" or "master" exist locally.
+ *
+ * @returns The name of the default branch.
+ * @throws {GwitError} If the default branch cannot be determined.
+ */
+export function getDefaultBranch(): string {
+  // Try the remote HEAD symref (most reliable when origin is configured)
+  const symref = runArgsSafe('git', ['symbolic-ref', 'refs/remotes/origin/HEAD'])
+  if (symref.success && symref.stdout.length > 0) {
+    // Output is "refs/remotes/origin/main" — extract the branch name
+    return symref.stdout.replace('refs/remotes/origin/', '')
+  }
+
+  // Fallback: check for common default branch names
+  if (branchExistsLocal('main')) return 'main'
+  if (branchExistsLocal('master')) return 'master'
+
+  throw new GwitError(
+    'Could not determine the default branch.',
+    'Specify the target explicitly: gwit merge <branch> --into main'
+  )
+}
+
+/**
+ * Returns how many commits a branch is ahead and behind relative to a base.
+ *
+ * @param branch - The branch to measure.
+ * @param base - The reference branch (e.g. "main").
+ * @param cwd - Optional working directory for the git command.
+ * @returns Object with ahead and behind counts.
+ */
+export function getAheadBehind(
+  branch: string,
+  base: string,
+  cwd?: string
+): { ahead: number; behind: number } {
+  const args = cwd
+    ? ['-C', cwd, 'rev-list', '--left-right', '--count', `${base}...${branch}`]
+    : ['rev-list', '--left-right', '--count', `${base}...${branch}`]
+
+  const result = runArgsSafe('git', args)
+  if (!result.success) return { ahead: 0, behind: 0 }
+
+  // Output format: "3\t5" where left (base ahead) = behind, right (branch ahead) = ahead
+  const parts = result.stdout.split('\t')
+  return {
+    behind: parseInt(parts[0] ?? '0', 10) || 0,
+    ahead: parseInt(parts[1] ?? '0', 10) || 0,
+  }
+}
+
+/**
+ * Merges a branch into the working tree at `cwd`.
+ *
+ * @param cwd - Working directory where the merge happens (target worktree).
+ * @param branch - The branch to merge in.
+ * @param noFf - If true, forces a merge commit even for fast-forward merges.
+ */
+export function mergeBranch(cwd: string, branch: string, noFf = false): void {
+  const args = ['-C', cwd, 'merge', branch]
+  if (noFf) args.splice(3, 0, '--no-ff')
+  runArgsInherited('git', args)
+}
+
+/**
+ * Performs a squash merge of a branch into the working tree at `cwd`.
+ * Stages all changes but does NOT create the commit — call `commitMerge` after.
+ *
+ * @param cwd - Working directory where the merge happens (target worktree).
+ * @param branch - The branch to squash-merge.
+ */
+export function squashMergeBranch(cwd: string, branch: string): void {
+  runArgsInherited('git', ['-C', cwd, 'merge', '--squash', branch])
+}
+
+/**
+ * Rebases the current branch at `cwd` onto a target branch.
+ *
+ * @param cwd - Working directory of the branch being rebased.
+ * @param onto - The branch to rebase onto.
+ */
+export function rebaseBranch(cwd: string, onto: string): void {
+  runArgsInherited('git', ['-C', cwd, 'rebase', onto])
+}
+
+/**
+ * Fast-forward only merge of a branch into the working tree at `cwd`.
+ * Fails if a fast-forward is not possible.
+ *
+ * @param cwd - Working directory where the merge happens.
+ * @param branch - The branch to fast-forward to.
+ */
+export function ffMergeBranch(cwd: string, branch: string): void {
+  runArgsInherited('git', ['-C', cwd, 'merge', '--ff-only', branch])
+}
+
+/**
+ * Creates a commit in the working tree at `cwd` with the given message.
+ *
+ * @param cwd - Working directory where the commit is created.
+ * @param message - The commit message.
+ */
+export function commitMerge(cwd: string, message: string): void {
+  runArgsInherited('git', ['-C', cwd, 'commit', '-m', message])
+}
+
+/**
+ * Renames a local branch.
+ *
+ * @param oldName - Current branch name.
+ * @param newName - New branch name.
+ */
+export function renameBranch(oldName: string, newName: string): void {
+  runArgsInherited('git', ['branch', '-m', oldName, newName])
+}
+
+/**
+ * Moves a linked worktree to a new directory path.
+ *
+ * @param oldPath - Current absolute path of the worktree.
+ * @param newPath - New absolute path for the worktree.
+ */
+export function moveWorktree(oldPath: string, newPath: string): void {
+  runArgsInherited('git', ['worktree', 'move', oldPath, newPath])
+}

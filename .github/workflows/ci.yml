@@ -1,0 +1,286 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel redundant runs on the same branch/PR
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  # ── Auto-formatting ───────────────────────────────────────────────────────────
+
+  auto-format:
+    name: Auto Format
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    # Only auto-format on PRs — Prettier is idempotent so no loop guard is needed.
+    if: github.event_name == 'pull_request'
+    outputs:
+      changes_detected: ${{ steps.auto-commit.outputs.changes_detected }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          token: ${{ secrets.AUTO_FORMAT_TOKEN }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm install --no-fund
+      - name: Run Prettier
+        run: npm run format
+      - name: Commit formatting fixes
+        id: auto-commit
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "style: auto-format with Prettier"
+          commit_author: "github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
+          commit_user_name: github-actions[bot]
+          commit_user_email: github-actions[bot]@users.noreply.github.com
+
+  # ── Standard quality gates ───────────────────────────────────────────────────
+  #
+  # All jobs depend on auto-format and will skip when it committed fixes
+  # (changes_detected=true). The PAT commit triggers a fresh workflow run where
+  # auto-format finds nothing to fix and these jobs proceed normally.
+  # On direct pushes to main auto-format is skipped (result=skipped) and all
+  # jobs run immediately.
+
+  lint:
+    name: Lint
+    needs: [auto-format]
+    if: ${{ !cancelled() && needs.auto-format.result != 'failure' && needs.auto-format.outputs.changes_detected != 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm install --no-fund
+      - run: npm run lint
+
+  format:
+    name: Format Check
+    needs: [auto-format]
+    if: ${{ !cancelled() && needs.auto-format.result != 'failure' && needs.auto-format.outputs.changes_detected != 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm install --no-fund
+      - run: npm run format:check
+
+  typecheck:
+    name: Type Check
+    needs: [auto-format]
+    if: ${{ !cancelled() && needs.auto-format.result != 'failure' && needs.auto-format.outputs.changes_detected != 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm install --no-fund
+      - run: npm run typecheck
+
+  test-unit:
+    name: Unit Tests
+    needs: [auto-format]
+    if: ${{ !cancelled() && needs.auto-format.result != 'failure' && needs.auto-format.outputs.changes_detected != 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm install --no-fund
+      - run: npm run test:unit
+
+  test-integration:
+    name: Integration Tests (${{ matrix.os }})
+    needs: [auto-format]
+    if: ${{ !cancelled() && needs.auto-format.result != 'failure' && needs.auto-format.outputs.changes_detected != 'true' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm install --no-fund
+      # Integration tests create real git repos — configure git identity
+      - name: Configure git identity
+        run: |
+          git config --global user.email "ci@gwit.dev"
+          git config --global user.name "gwit CI"
+      - run: npm run test:integration
+
+  security-audit:
+    name: Security Audit
+    needs: [auto-format]
+    if: ${{ !cancelled() && needs.auto-format.result != 'failure' && needs.auto-format.outputs.changes_detected != 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm install --no-fund
+      # Fail on high or critical severity vulnerabilities
+      - run: npm audit --audit-level=high
+
+  # ── Code maintainability ─────────────────────────────────────────────────────
+
+  maintainability:
+    name: Maintainability
+    needs: [auto-format]
+    if: ${{ !cancelled() && needs.auto-format.result != 'failure' && needs.auto-format.outputs.changes_detected != 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm install --no-fund
+
+      # Naming conventions, complexity limits, JSDoc (see eslint.maintainability.cjs)
+      - name: ESLint maintainability rules
+        run: npm run lint:maintainability
+
+      # Enforce section headers (// ─── Name ─────) in all non-test source files
+      # over 80 lines. The ─ character is U+2500 BOX DRAWINGS LIGHT HORIZONTAL.
+      - name: Section header check
+        shell: bash
+        run: |
+          FAILED=0
+          while IFS= read -r file; do
+            lines=$(wc -l < "$file")
+            if [ "$lines" -gt 80 ]; then
+              if ! grep -qP "// \x{2500}{3} " "$file"; then
+                echo "::error file=$file::Missing section headers in $file ($lines lines). See CLAUDE.md."
+                FAILED=1
+              fi
+            fi
+          done < <(git ls-files 'src/*.ts' 'src/**/*.ts' | grep -v '__tests__')
+          exit $FAILED
+
+  # ── Sensitive file and secret scanning ───────────────────────────────────────
+  #
+  # These jobs inspect git history and the committed file list — they do not
+  # validate source code quality, so they run independently of auto-format.
+
+  secret-scan:
+    name: Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  sensitive-files:
+    name: Sensitive Files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for accidentally committed sensitive files
+        shell: bash
+        run: |
+          FAILED=0
+          FORBIDDEN=$(git ls-files | grep -E \
+            '(^|/)node_modules/|\.env$|\.env\.|\.gwitrc$|worktrees\.json$|\.pem$|\.key$|\.p12$|\.pfx$|\.log$|^dist/' \
+            || true)
+          if [ -n "$FORBIDDEN" ]; then
+            echo "::error::Sensitive or generated files found in git index:"
+            echo "$FORBIDDEN"
+            FAILED=1
+          fi
+          exit $FAILED
+
+  # ── Documentation integrity ──────────────────────────────────────────────────
+
+  docs-integrity:
+    name: Docs Integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Verify required documentation files exist
+      - name: Required docs exist
+        shell: bash
+        run: |
+          FAILED=0
+          for f in \
+            README.md \
+            docs/security.md \
+            .github/SECURITY.md; do
+            if [ ! -f "$f" ]; then
+              echo "::error::Required documentation file missing: $f"
+              FAILED=1
+            fi
+          done
+          exit $FAILED
+
+      # On PRs: warn if security-relevant source files changed but
+      # docs/security.md was not updated in the same PR
+      - name: Security docs staleness check
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          BASE=${{ github.event.pull_request.base.sha }}
+          HEAD=${{ github.event.pull_request.head.sha }}
+          CHANGED=$(git diff --name-only "$BASE" "$HEAD" 2>/dev/null || true)
+          SECURITY_CHANGED=$(echo "$CHANGED" | grep -E \
+            '^src/core/|^src/lib/shell\.ts$|^package\.json$|^package-lock\.json$' \
+            || true)
+          DOCS_UPDATED=$(echo "$CHANGED" | grep -F 'docs/security.md' || true)
+          if [ -n "$SECURITY_CHANGED" ] && [ -z "$DOCS_UPDATED" ]; then
+            echo "::warning::Security-relevant files changed but docs/security.md was not updated."
+            echo "::warning::Changed files: $(echo "$SECURITY_CHANGED" | tr '\n' ' ')"
+            echo "::warning::Consider updating docs/security.md if the security posture changed."
+          fi
+
+  # ── Build verification ───────────────────────────────────────────────────────
+
+  build:
+    name: Build
+    needs: [lint, typecheck, test-unit]
+    if: ${{ !cancelled() && needs.lint.result == 'success' && needs.typecheck.result == 'success' && needs.test-unit.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm install --no-fund
+      - run: npm run build
+      # Verify the output exists and is executable
+      - name: Verify build output
+        run: |
+          test -f dist/index.cjs || (echo "::error::dist/index.cjs not found" && exit 1)
+          node dist/index.cjs --version

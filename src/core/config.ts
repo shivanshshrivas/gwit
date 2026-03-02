@@ -2,8 +2,7 @@ import * as fs from 'fs'
 
 import inquirer from 'inquirer'
 
-import type { GwitConfig } from '../types'
-import { GwitError } from '../types'
+import { type GwitConfig, GwitError } from '../types'
 import { getConfigPath, getGwitDir } from '../lib/paths'
 import { ui } from '../lib/ui'
 
