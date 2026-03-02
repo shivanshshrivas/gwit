@@ -11,12 +11,18 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   # ── Auto-formatting ───────────────────────────────────────────────────────────
 
   auto-format:
     name: Auto Format
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     # Only auto-format on PRs — Prettier is idempotent so no loop guard is needed.
     if: github.event_name == 'pull_request'
     outputs:
