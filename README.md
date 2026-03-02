@@ -26,9 +26,15 @@ gwit -b fix/login-page        # create a new branch from HEAD
 
 # Day-to-day
 gwit list                     # show all active worktrees
+gwit status                   # see ahead/behind, dirty state, PR info
 gwit sync feature/auth        # re-copy files after .env changes
 gwit open feature/auth        # re-open editor for an existing worktree
+
+# Merge and clean up
+gwit merge feature/auth       # merge branch back into main
 gwit remove feature/auth      # run cleanup hooks and remove worktree
+gwit sweep                    # bulk-remove all merged worktrees
+gwit rename old/name new/name # rename a worktree branch
 ```
 
 ## How it works
@@ -118,6 +124,62 @@ gwit open feature/auth
 gwit open feature/auth --editor cursor
 ```
 
+### `gwit merge <branch>`
+
+Merge a worktree branch back into the target branch. Combines git-tracked changes (via real git merge) with gitignored files (via reverse `.gwitinclude` sync) in a single command.
+
+```sh
+gwit merge feature/auth               # standard merge into default branch
+gwit merge feature/auth --into dev    # merge into a specific branch
+gwit merge feature/auth --squash      # squash all commits into one
+gwit merge feature/auth --rebase      # rebase onto target, then fast-forward
+gwit merge feature/auth --no-ff       # force a merge commit
+gwit merge feature/auth --cleanup     # remove worktree after successful merge
+gwit merge feature/auth --no-sync-back  # skip reverse .gwitinclude copy
+```
+
+What it does, in order:
+
+1. Validates the worktree exists in the registry
+2. Resolves the target branch (default: repo's default branch)
+3. Reverse-copies `.gwitinclude` files from worktree back to main (unless `--no-sync-back`)
+4. Checks out the target branch in the main worktree
+5. Merges the feature branch using the chosen strategy
+6. Optionally removes the worktree (`--cleanup`)
+
+If the merge fails with conflicts, gwit exits with a helpful message so you can resolve manually.
+
+### `gwit status`
+
+Show detailed status of all active gwit worktrees.
+
+```sh
+gwit status          # rich table output
+gwit status --json   # machine-readable JSON
+```
+
+Displays per-worktree: branch, path, port, ahead/behind counts, dirty-file count, and PR info (if [`gh` CLI](https://cli.github.com) is installed).
+
+### `gwit sweep`
+
+Bulk-remove worktrees whose branches are fully merged into the default branch or whose GitHub PRs are merged/closed.
+
+```sh
+gwit sweep             # interactive confirmation
+gwit sweep --dry-run   # show what would be removed
+gwit sweep --force     # skip confirmation
+```
+
+Runs cleanup hooks for each removed worktree, just like `gwit remove`.
+
+### `gwit rename <old-branch> <new-branch>`
+
+Rename a worktree's git branch, move the directory (if the slug changes), and update the registry atomically.
+
+```sh
+gwit rename feature/auth feature/authentication
+```
+
 ### `gwit config`
 
 Show or update global configuration stored in `~/.gwitrc`.
@@ -145,14 +207,18 @@ gwit config set basePort 4000      # starting port for auto-assignment
 
 ### `.gwitinclude`
 
-List of gitignored files and directories to copy into every new worktree. One entry per line, comments with `#` ignored.
+List of gitignored files and directories to copy into every new worktree. One entry per line, comments with `#` ignored. Supports glob patterns via [minimatch](https://github.com/isaacs/minimatch).
 
 ```
 # .gwitinclude - files to copy into each new worktree
 .env
 .env.local
 certs/
+*.pem
+secrets/**
 ```
+
+Glob patterns (`*`, `?`, `[...]`, `**`) are expanded against the set of gitignored files in the repo. Literal entries are copied directly.
 
 Only gitignored files are eligible to copy. Tracked files are silently skipped - gwit is an allowlist for files that must be present but cannot be committed.
 

@@ -16,8 +16,9 @@ the trust boundaries it operates within, and how to report vulnerabilities.
 7. [Registry Integrity](#registry-integrity)
 8. [Port Allocation](#port-allocation)
 9. [Input Validation](#input-validation)
-10. [Dependency Surface](#dependency-surface)
-11. [Reporting a Vulnerability](#reporting-a-vulnerability)
+10. [Merge Command Safety](#merge-command-safety)
+11. [Dependency Surface](#dependency-surface)
+12. [Reporting a Vulnerability](#reporting-a-vulnerability)
 
 ---
 
@@ -83,9 +84,10 @@ runArgs('git', ['worktree', 'add', worktreePath, branch])
 
 ### Audit scope
 
-All 14 `git` call sites in `src/core/git.ts` were audited. The two that previously
-used string interpolation (`branchExistsRemote`, `isBranchMerged`) were converted to
-`runArgsSafe` before the v0.1.0 release.
+All git call sites in `src/core/git.ts` use the `runArgs` / `runArgsSafe` /
+`runArgsInherited` family for any command that includes user-provided data (branch
+names, paths, ref names). The string-interpolating `run` / `runSafe` functions are
+used only for static commands with no external input (e.g. `git rev-parse --git-dir`).
 
 ---
 
@@ -316,6 +318,44 @@ Entries are trimmed and blank/comment lines are stripped. Absolute paths and
 path-traversal sequences are rejected as described in
 [Path Traversal Prevention](#path-traversal-prevention).
 
+Glob patterns (`*`, `?`, `[...]`, `**`) are expanded via `minimatch` against the
+set of gitignored files returned by `git ls-files --others --ignored`. The expansion
+is always scoped to the repository — glob results that resolve outside the repo root
+are filtered out by the same containment check applied to literal entries. Patterns
+cannot match tracked files because the input set only contains ignored files.
+
+---
+
+## Merge Command Safety
+
+`gwit merge` combines git merge operations with reverse `.gwitinclude` file syncing.
+Both operations have security considerations:
+
+### Reverse `.gwitinclude` copy
+
+`gwit merge` can copy gitignored files **from the worktree back to the main worktree**
+(the reverse of what `gwit create` does). This reverse copy applies the same three
+guards as the forward copy:
+
+1. **Absolute path rejection** — entries starting with `/` or a drive letter are skipped.
+2. **Containment check** — resolved paths must stay within the worktree root.
+3. **Symlink safety** — `fs.cpSync` with `dereference: false`.
+
+The `--no-sync-back` flag disables reverse copying entirely if not needed.
+
+### Git merge operations
+
+All git merge commands (`merge`, `rebase`, `checkout`) use the `runArgs` /
+`runArgsInherited` family — branch names and paths are passed as array arguments,
+never string-interpolated. Merge conflict errors are caught and surfaced as
+`GwitError` with a suggestion to resolve manually.
+
+### Cleanup after merge
+
+When `--cleanup` is used, `gwit merge` removes the worktree after a successful
+merge. This follows the same cleanup path as `gwit remove`: cleanup hooks run first,
+then `git worktree remove`, then the registry is updated.
+
 ---
 
 ## Dependency Surface
@@ -326,9 +366,15 @@ gwit's runtime dependency tree is intentionally minimal:
 |---|---|---|
 | `commander` | ^12.1.0 | CLI argument parsing |
 | `inquirer` | ^8.2.6 | Interactive first-run setup |
+| `minimatch` | ^10.0.1 | Glob pattern matching for `.gwitinclude` |
 
 No network requests are made at runtime. No eval or dynamic code loading occurs.
 All git operations shell out to the `git` binary already present on the system.
+
+`minimatch` is used only to match file paths against glob patterns within the
+repository. Patterns are user-authored (committed in `.gwitinclude`) and the match
+input is the output of `git ls-files`, so both sides are controlled by the
+repository owner.
 
 Dependencies are pinned to minor-version ranges (`^`) to receive patch security
 fixes automatically via `npm update`, while avoiding unintentional major-version
