@@ -33,6 +33,8 @@ vi.mock('../../src/lib/paths', () => ({
   getGwitDir: () => GWIT_DIR,
   getRegistryPath: () => REGISTRY_PATH,
   getConfigPath: () => CONFIG_PATH,
+  getSnapshotsDir: () => path.join(GWIT_DIR, 'snapshots'),
+  getSnapshotDir: (slug: string) => path.join(GWIT_DIR, 'snapshots', slug),
   // Use subdirectory placement — keeps worktrees inside the temp repo
   getWorktreePath: (mainPath: string, _location: string, slug: string) =>
     path.join(mainPath, '.worktrees', slug),

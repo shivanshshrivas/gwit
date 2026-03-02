@@ -10,11 +10,15 @@ docs/
 .claude/
 .private/
 
+# GitHub (CI, templates)
+.github/
+
 # Build config
 tsconfig.json
 tsup.config.ts
 vitest.config.ts
 .eslintrc.cjs
+eslint.maintainability.cjs
 .prettierrc
 
 # Dev artifacts

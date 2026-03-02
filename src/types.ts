@@ -38,6 +38,24 @@ export interface WorktreeRegistry {
   [mainRepoPath: string]: WorktreeRepoRegistry
 }
 
+// ─── Snapshots ────────────────────────────────────────────────────────────────
+
+export interface FileSnapshot {
+  /** SHA-256 hex digest captured at snapshot time. */
+  hash: string
+  /** File size in bytes captured at snapshot time. */
+  size: number
+}
+
+export interface SnapshotManifest {
+  /** Branch name associated with this snapshot. */
+  branch: string
+  /** Snapshot creation timestamp in ISO 8601 format. */
+  createdAt: string
+  /** Snapshot metadata keyed by repo-relative path. */
+  files: Record<string, FileSnapshot>
+}
+
 // ─── Environment ──────────────────────────────────────────────────────────────
 
 /**

@@ -1,7 +1,14 @@
 import { describe, it, expect } from 'vitest'
 import * as path from 'path'
 import * as os from 'os'
-import { getGwitDir, getRegistryPath, getConfigPath, getWorktreePath } from '../../src/lib/paths'
+import {
+  getGwitDir,
+  getRegistryPath,
+  getSnapshotsDir,
+  getSnapshotDir,
+  getConfigPath,
+  getWorktreePath,
+} from '../../src/lib/paths'
 
 describe('getGwitDir', () => {
   it('returns ~/.gwit', () => {
@@ -12,6 +19,20 @@ describe('getGwitDir', () => {
 describe('getRegistryPath', () => {
   it('returns ~/.gwit/worktrees.json', () => {
     expect(getRegistryPath()).toBe(path.join(os.homedir(), '.gwit', 'worktrees.json'))
+  })
+})
+
+describe('getSnapshotsDir', () => {
+  it('returns ~/.gwit/snapshots', () => {
+    expect(getSnapshotsDir()).toBe(path.join(os.homedir(), '.gwit', 'snapshots'))
+  })
+})
+
+describe('getSnapshotDir', () => {
+  it('returns ~/.gwit/snapshots/{slug}', () => {
+    expect(getSnapshotDir('feature_auth')).toBe(
+      path.join(os.homedir(), '.gwit', 'snapshots', 'feature_auth')
+    )
   })
 })
 

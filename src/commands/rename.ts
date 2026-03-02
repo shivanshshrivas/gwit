@@ -5,6 +5,7 @@ import { getWorktreePath } from '../lib/paths'
 import { isGitRepo, getMainWorktreePath, renameBranch, moveWorktree } from '../core/git'
 import { loadConfig } from '../core/config'
 import { getWorktreeEntry, removeWorktreeEntry, addWorktreeEntry } from '../core/registry'
+import { renameSnapshot } from '../core/snapshot'
 
 // ─── Command ──────────────────────────────────────────────────────────────────
 
@@ -59,6 +60,7 @@ export async function renameCommand(oldBranch: string, newBranch: string): Promi
     newPath = getWorktreePath(mainPath, config.location, newSlug)
     ui.step(`Moving worktree to ${newPath}…`)
     moveWorktree(entry.path, newPath)
+    renameSnapshot(oldSlug, newSlug)
   }
 
   // ── Update registry ──────────────────────────────────────────────────────

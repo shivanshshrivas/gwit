@@ -19,6 +19,8 @@ import { buildEnvironment } from '../core/env'
 import { runCleanupHooks } from '../core/hooks'
 import { getWorktreeEntry, removeWorktreeEntry } from '../core/registry'
 import { reverseCopyIncludedFiles } from '../core/files'
+import { mergeBackIncludedFiles } from '../core/merge'
+import { readSnapshot } from '../core/snapshot'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -116,6 +118,66 @@ async function cleanupWorktree(
   ui.success(`Cleaned up worktree for '${branch}' (port ${port} freed)`)
 }
 
+/**
+ * Syncs `.gwitinclude` files from worktree back to main using snapshot-aware
+ * three-way merge when possible, with fallback for legacy worktrees.
+ *
+ * @param worktreePath - Absolute path to source worktree.
+ * @param mainPath - Absolute path to destination main worktree.
+ * @param slug - Worktree slug for snapshot lookup.
+ * @param branch - Branch name for user-facing messages.
+ */
+function syncBackFiles(worktreePath: string, mainPath: string, slug: string, branch: string): void {
+  const snapshot = readSnapshot(slug)
+
+  if (!snapshot) {
+    ui.warn(`No snapshot found for '${branch}' — falling back to direct copy.`)
+    const copied = reverseCopyIncludedFiles(worktreePath, mainPath)
+    if (copied.length > 0) {
+      ui.success(`Synced ${copied.length} file${copied.length === 1 ? '' : 's'} back`)
+      copied.forEach((f) => ui.dim(`  ${f}`))
+    } else {
+      ui.dim('  No .gwitinclude files to sync back')
+    }
+    return
+  }
+
+  const result = mergeBackIncludedFiles(worktreePath, mainPath, slug)
+  const changed = result.copied.length + result.merged.length + result.conflicts.length
+
+  if (result.copied.length > 0) {
+    ui.success(
+      `Copied ${result.copied.length} worktree-only file${result.copied.length === 1 ? '' : 's'}`
+    )
+    result.copied.forEach((f) => ui.dim(`  ${f}`))
+  }
+
+  if (result.merged.length > 0) {
+    ui.success(
+      `Merged ${result.merged.length} file${result.merged.length === 1 ? '' : 's'} cleanly`
+    )
+    result.merged.forEach((f) => ui.dim(`  ${f}`))
+  }
+
+  if (result.conflicts.length > 0) {
+    ui.warn(
+      `Conflicts in ${result.conflicts.length} file${result.conflicts.length === 1 ? '' : 's'} (markers written to main)`
+    )
+    result.conflicts.forEach((f) => ui.dim(`  ${f}`))
+  }
+
+  if (result.binarySkipped.length > 0) {
+    ui.warn(
+      `Skipped ${result.binarySkipped.length} binary file${result.binarySkipped.length === 1 ? '' : 's'} (manual resolution required)`
+    )
+    result.binarySkipped.forEach((f) => ui.dim(`  ${f}`))
+  }
+
+  if (changed === 0 && result.binarySkipped.length === 0) {
+    ui.dim('  No .gwitinclude files to sync back')
+  }
+}
+
 // ─── Command ──────────────────────────────────────────────────────────────────
 
 /**
@@ -170,13 +232,7 @@ export async function mergeCommand(branch: string, options: MergeOptions): Promi
 
   if (options.syncBack !== false) {
     ui.step('Syncing .gwitinclude files back to main…')
-    const copied = reverseCopyIncludedFiles(entry.path, mainPath)
-    if (copied.length > 0) {
-      ui.success(`Synced ${copied.length} file${copied.length === 1 ? '' : 's'} back`)
-      copied.forEach((f) => ui.dim(`  ${f}`))
-    } else {
-      ui.dim('  No .gwitinclude files to sync back')
-    }
+    syncBackFiles(entry.path, mainPath, entry.slug, entry.branch)
   }
 
   // ── Git merge ────────────────────────────────────────────────────────────
