@@ -1,12 +1,15 @@
 import * as fs from 'fs'
 import * as path from 'path'
 
+import { minimatch } from 'minimatch'
+
 import { runArgsSafe } from '../lib/shell'
 import { ui } from '../lib/ui'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const GWITINCLUDE_FILE = '.gwitinclude'
+const GLOB_CHARS = /[*?[]/
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -74,6 +77,34 @@ function copyEntry(src: string, dest: string): void {
   }
 }
 
+/**
+ * Returns true if a `.gwitinclude` entry contains glob metacharacters.
+ * @param entry - A parsed .gwitinclude line.
+ * @returns True if the entry is a glob pattern.
+ */
+function isGlobPattern(entry: string): boolean {
+  return GLOB_CHARS.test(entry)
+}
+
+/**
+ * Expands a glob pattern against the gitignored (untracked) files in the repo.
+ * Lists all ignored+untracked files, then filters with minimatch.
+ *
+ * @param pattern - The glob pattern from .gwitinclude.
+ * @param cwd - The repo root to scan.
+ * @returns Array of relative file paths matching the pattern.
+ */
+function expandGlob(pattern: string, cwd: string): string[] {
+  // List files that are ignored AND not tracked — these are the candidates
+  const result = runArgsSafe('git', ['ls-files', '--others', '--ignored', '--exclude-standard'], {
+    cwd,
+  })
+  if (!result.success) return []
+
+  const files = result.stdout.split('\n').filter((f) => f.length > 0)
+  return files.filter((f) => minimatch(f, pattern, { dot: true }))
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
@@ -104,9 +135,19 @@ export function parseGwitInclude(mainPath: string): string[] {
  * @returns Array of entry paths that were actually copied, for user feedback.
  */
 export function copyIncludedFiles(mainPath: string, worktreePath: string): string[] {
-  const entries = parseGwitInclude(mainPath)
+  const rawEntries = parseGwitInclude(mainPath)
 
-  if (entries.length === 0) return []
+  if (rawEntries.length === 0) return []
+
+  // Expand glob patterns into concrete file paths
+  const entries: string[] = []
+  for (const entry of rawEntries) {
+    if (isGlobPattern(entry)) {
+      entries.push(...expandGlob(entry, mainPath))
+    } else {
+      entries.push(entry)
+    }
+  }
 
   const copied: string[] = []
 
@@ -152,6 +193,84 @@ export function copyIncludedFiles(mainPath: string, worktreePath: string): strin
 
     if (isGitTracked(entryPath, mainPath)) {
       // Shouldn't normally happen, but guard against misconfigured .gwitinclude
+      ui.dim(`  skip ${entry} (tracked by git)`)
+      continue
+    }
+
+    // ── Copy ─────────────────────────────────────────────────────────────────
+
+    copyEntry(src, dest)
+    copied.push(entry)
+  }
+
+  return copied
+}
+
+/**
+ * Reverse-copies files listed in `.gwitinclude` from a worktree back to the
+ * main worktree. Used by `gwit merge` to sync gitignored files (like `.env`)
+ * back to main before merging the branch.
+ *
+ * Applies the same security guards as `copyIncludedFiles` (path traversal,
+ * gitignored check) but in the opposite direction.
+ *
+ * @param worktreePath - Absolute path to the source worktree.
+ * @param mainPath - Absolute path to the main (destination) worktree.
+ * @returns Array of entry paths that were actually copied back.
+ */
+export function reverseCopyIncludedFiles(worktreePath: string, mainPath: string): string[] {
+  const rawEntries = parseGwitInclude(mainPath)
+
+  if (rawEntries.length === 0) return []
+
+  // Expand glob patterns against the worktree (source for reverse copy)
+  const entries: string[] = []
+  for (const entry of rawEntries) {
+    if (isGlobPattern(entry)) {
+      entries.push(...expandGlob(entry, worktreePath))
+    } else {
+      entries.push(entry)
+    }
+  }
+
+  const copied: string[] = []
+
+  for (const entry of entries) {
+    const entryPath = entry.replace(/\/$/, '')
+
+    // ── Path traversal guard ─────────────────────────────────────────────────
+
+    if (path.isAbsolute(entryPath)) {
+      ui.dim(`  skip ${entry} (absolute path not allowed)`)
+      continue
+    }
+
+    const worktreeResolved = path.resolve(worktreePath)
+    const resolvedSrc = path.resolve(worktreePath, entryPath)
+    const rel = path.relative(worktreeResolved, resolvedSrc)
+    if (rel.startsWith('..') || path.isAbsolute(rel)) {
+      ui.dim(`  skip ${entry} (path escapes repo)`)
+      continue
+    }
+
+    const src = resolvedSrc
+    const dest = path.resolve(mainPath, entryPath)
+
+    // ── Guards ──────────────────────────────────────────────────────────────
+
+    if (!fs.existsSync(src)) {
+      ui.dim(`  skip ${entry} (not found in worktree)`)
+      continue
+    }
+
+    // Verify the file is gitignored in the main repo — only reverse-copy
+    // gitignored files. Tracked files are managed by git merge.
+    if (!isGitIgnored(entryPath, mainPath)) {
+      ui.dim(`  skip ${entry} (not gitignored)`)
+      continue
+    }
+
+    if (isGitTracked(entryPath, mainPath)) {
       ui.dim(`  skip ${entry} (tracked by git)`)
       continue
     }

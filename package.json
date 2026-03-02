@@ -21,22 +21,30 @@
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
     "lint": "eslint src tests --ext .ts",
-    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\""
+    "lint:maintainability": "eslint -c eslint.maintainability.cjs src/",
+    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\""
   },
   "dependencies": {
     "commander": "^12.1.0",
-    "inquirer": "^8.2.6"
+    "inquirer": "^8.2.6",
+    "minimatch": "^10.2.4"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.3",
     "@types/inquirer": "^8.2.10",
+    "@types/minimatch": "^5.1.2",
     "@types/node": "^20.0.0",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "eslint": "^8.57.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-jsdoc": "^61.7.1",
     "prettier": "^3.2.0",
     "tsup": "^8.0.0",
     "tsx": "^4.7.0",
     "typescript": "^5.4.0",
+    "typescript-eslint": "^8.56.1",
     "vitest": "^1.6.0"
   }
 }
