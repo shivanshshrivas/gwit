@@ -13,6 +13,7 @@ import {
 import { buildEnvironment } from '../core/env'
 import { runCleanupHooks } from '../core/hooks'
 import { getWorktreeEntry, removeWorktreeEntry } from '../core/registry'
+import { deleteSnapshot } from '../core/snapshot'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -119,5 +120,6 @@ export async function removeCommand(branch: string, options: RemoveOptions): Pro
   // ── Update registry ───────────────────────────────────────────────────────
 
   await removeWorktreeEntry(mainPath, branch)
+  deleteSnapshot(entry.slug)
   ui.success(`Removed worktree for '${branch}' (port ${entry.port} freed)`)
 }

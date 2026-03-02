@@ -101,9 +101,10 @@ program
 
 program
   .command('sync [branch]')
-  .description('Re-copy .gwitinclude files into an existing worktree')
-  .action((branch: string | undefined) => {
-    syncCommand(branch)
+  .description('Sync .gwitinclude files into a worktree or back to main')
+  .option('--back', 'Three-way merge .gwitinclude files back to main')
+  .action((branch: string | undefined, options) => {
+    syncCommand(branch, options)
   })
 
 program

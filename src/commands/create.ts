@@ -13,6 +13,7 @@ import {
 } from '../core/git'
 import { ensureConfig } from '../core/config'
 import { copyIncludedFiles } from '../core/files'
+import { createSnapshot } from '../core/snapshot'
 import { allocatePort } from '../core/ports'
 import { buildEnvironment } from '../core/env'
 import { peekNextIndex, addWorktreeEntry } from '../core/registry'
@@ -119,6 +120,7 @@ export async function createCommand(branch: string, options: CreateOptions): Pro
 
   const copied = copyIncludedFiles(mainPath, worktreePath)
   if (copied.length > 0) {
+    createSnapshot(slug, branch, mainPath, copied)
     ui.success(`Copied ${copied.length} file${copied.length === 1 ? '' : 's'} from .gwitinclude`)
     copied.forEach((f) => ui.dim(`  ${f}`))
   }
