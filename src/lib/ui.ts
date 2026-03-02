@@ -14,7 +14,7 @@ const ANSI = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Wraps text in an ANSI code, but only when stdout is a real TTY. */
+// Wraps text in an ANSI code, but only when stdout is a real TTY.
 function colorize(text: string, code: string): string {
   if (!process.stdout.isTTY) return text
   return `${code}${text}${ANSI.reset}`
@@ -22,23 +22,23 @@ function colorize(text: string, code: string): string {
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
-/** Convenience methods for consistent terminal output across all commands. */
+// Convenience methods for consistent terminal output across all commands.
 export const ui = {
-  /** Prints a green success line prefixed with ✓. */
+  // Prints a green success line prefixed with ✓.
   success: (msg: string) => console.log(colorize(`✓ ${msg}`, ANSI.green)),
-  /** Prints a red error line to stderr prefixed with ✗. */
+  // Prints a red error line to stderr prefixed with ✗.
   error: (msg: string) => console.error(colorize(`✗ ${msg}`, ANSI.red)),
-  /** Prints a yellow warning line to stderr prefixed with ⚠. */
+  // Prints a yellow warning line to stderr prefixed with ⚠.
   warn: (msg: string) => console.warn(colorize(`⚠ ${msg}`, ANSI.yellow)),
-  /** Prints a cyan informational line. */
+  // Prints a cyan informational line.
   info: (msg: string) => console.log(colorize(`  ${msg}`, ANSI.cyan)),
-  /** Prints a cyan step line prefixed with →. */
+  // Prints a cyan step line prefixed with →.
   step: (msg: string) => console.log(colorize(`→ ${msg}`, ANSI.cyan)),
-  /** Prints a dimmed line (secondary information). */
+  // Prints a dimmed line (secondary information).
   dim: (msg: string) => console.log(colorize(msg, ANSI.dim)),
-  /** Returns bold-wrapped text (for embedding in other strings). */
+  // Returns bold-wrapped text (for embedding in other strings).
   bold: (text: string) => colorize(text, ANSI.bold),
-  /** Returns gray-wrapped text (for embedding in other strings). */
+  // Returns gray-wrapped text (for embedding in other strings).
   gray: (text: string) => colorize(text, ANSI.gray),
 }
 
