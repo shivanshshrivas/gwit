@@ -2,7 +2,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 
 import { runArgsWithExitCode } from '../lib/shell'
-import { isGitIgnored, isGitTracked } from './files'
+import { isGitIgnored, isGitTracked, resolveIncludedFilePaths } from './files'
 import { hashFile, readSnapshot, getSnapshotFilePath } from './snapshot'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -95,6 +95,7 @@ function runGitMergeFile(
  * - convergent change (`main === worktree !== base`) -> skip
  * - divergent text (`main !== worktree !== base`) -> `git merge-file`
  * - divergent binary -> skip with binary marker
+ * - include file outside snapshot -> guarded direct copy from worktree to main
  *
  * @param worktreePath - Absolute path to source worktree.
  * @param mainPath - Absolute path to destination main worktree.
@@ -117,11 +118,12 @@ export function mergeBackIncludedFiles(
   const manifest = readSnapshot(slug)
   if (!manifest) return result
 
-  const relPaths = Object.keys(manifest.files).sort()
+  const snapshotEntries = Object.keys(manifest.files).sort()
+  const snapshotRelPathSet = new Set(snapshotEntries.map((relPath) => normalizeRelPath(relPath)))
 
-  for (const rawRelPath of relPaths) {
+  for (const rawRelPath of snapshotEntries) {
     const relPath = normalizeRelPath(rawRelPath)
-    const base = manifest.files[relPath]
+    const base = manifest.files[rawRelPath]
     if (!base) {
       result.skipped.push(relPath)
       continue
@@ -186,6 +188,31 @@ export function mergeBackIncludedFiles(
     } else {
       result.merged.push(relPath)
     }
+  }
+
+  const includeFiles = resolveIncludedFilePaths(mainPath, worktreePath)
+  for (const relPath of includeFiles) {
+    if (snapshotRelPathSet.has(relPath)) continue
+
+    if (!isGitIgnored(relPath, mainPath) || isGitTracked(relPath, mainPath)) {
+      result.skipped.push(relPath)
+      continue
+    }
+
+    const worktreeFile = path.resolve(worktreePath, relPath)
+    if (!isExistingFile(worktreeFile)) {
+      result.skipped.push(relPath)
+      continue
+    }
+
+    const mainFile = path.resolve(mainPath, relPath)
+    if (isExistingFile(mainFile) && hashFile(mainFile) === hashFile(worktreeFile)) {
+      result.skipped.push(relPath)
+      continue
+    }
+
+    copyFileToMain(worktreeFile, mainFile)
+    result.copied.push(relPath)
   }
 
   return result

@@ -134,6 +134,9 @@ gwit sync --back               # auto-detect branch, then merge back
 If both sides changed different text regions, gwit applies a clean merge.  
 If both sides changed the same region, gwit writes git-style conflict markers  
 (`<<<<<<<`, `=======`, `>>>>>>>`). Binary conflicts are skipped with a warning.
+Files currently matched by `.gwitinclude` but not present in the snapshot
+(for example, new files created later inside an included ignored directory)
+are reverse-copied directly from worktree to main.
 
 ### `gwit open <branch>`
 
