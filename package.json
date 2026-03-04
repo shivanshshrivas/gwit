@@ -1,6 +1,6 @@
 {
   "name": "@shivanshshrivas/gwit",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Fully isolated git worktrees for parallel development",
   "keywords": [
     "git",
@@ -26,6 +26,7 @@
   ],
   "scripts": {
     "build": "tsup",
+    "prepack": "npm run build",
     "dev": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
