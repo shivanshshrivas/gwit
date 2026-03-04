@@ -83,6 +83,106 @@ function runGitMergeFile(
   return result.exitCode > 0
 }
 
+function isInMergeScope(relPath: string, mainPath: string): boolean {
+  return isGitIgnored(relPath, mainPath) && !isGitTracked(relPath, mainPath)
+}
+
+function processSnapshotTrackedFile(
+  result: MergeBackResult,
+  relPath: string,
+  worktreePath: string,
+  mainPath: string,
+  slug: string,
+  branch: string,
+  baseHash: string
+): void {
+  if (!isInMergeScope(relPath, mainPath)) {
+    result.skipped.push(relPath)
+    return
+  }
+
+  const mainFile = path.resolve(mainPath, relPath)
+  const worktreeFile = path.resolve(worktreePath, relPath)
+  const snapshotFile = getSnapshotFilePath(slug, relPath)
+
+  // Main deleted the file after snapshot: respect main and do not recreate.
+  if (!isExistingFile(mainFile)) {
+    result.skipped.push(relPath)
+    return
+  }
+
+  // Worktree deleted the file: skip and let user resolve intent manually.
+  if (!isExistingFile(worktreeFile)) {
+    result.skipped.push(relPath)
+    return
+  }
+
+  // Snapshot missing/corrupt for this file means no safe merge base.
+  if (!snapshotFile || !isExistingFile(snapshotFile)) {
+    result.skipped.push(relPath)
+    return
+  }
+
+  const mainHash = hashFile(mainFile)
+  const worktreeHash = hashFile(worktreeFile)
+
+  if (baseHash === mainHash && baseHash === worktreeHash) {
+    result.skipped.push(relPath)
+    return
+  }
+
+  if (baseHash === mainHash) {
+    copyFileToMain(worktreeFile, mainFile)
+    result.copied.push(relPath)
+    return
+  }
+
+  if (baseHash === worktreeHash || mainHash === worktreeHash) {
+    result.skipped.push(relPath)
+    return
+  }
+
+  if (isBinaryFile(mainFile) || isBinaryFile(worktreeFile) || isBinaryFile(snapshotFile)) {
+    result.binarySkipped.push(relPath)
+    return
+  }
+
+  const hasConflicts = runGitMergeFile(mainFile, snapshotFile, worktreeFile, branch)
+  if (hasConflicts) {
+    result.conflicts.push(relPath)
+    return
+  }
+
+  result.merged.push(relPath)
+}
+
+function processNonSnapshotIncludeFile(
+  result: MergeBackResult,
+  relPath: string,
+  worktreePath: string,
+  mainPath: string
+): void {
+  if (!isInMergeScope(relPath, mainPath)) {
+    result.skipped.push(relPath)
+    return
+  }
+
+  const worktreeFile = path.resolve(worktreePath, relPath)
+  if (!isExistingFile(worktreeFile)) {
+    result.skipped.push(relPath)
+    return
+  }
+
+  const mainFile = path.resolve(mainPath, relPath)
+  if (isExistingFile(mainFile) && hashFile(mainFile) === hashFile(worktreeFile)) {
+    result.skipped.push(relPath)
+    return
+  }
+
+  copyFileToMain(worktreeFile, mainFile)
+  result.copied.push(relPath)
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
@@ -128,91 +228,21 @@ export function mergeBackIncludedFiles(
       result.skipped.push(relPath)
       continue
     }
-
-    // Keep merge scope constrained to files that are still gitignored in main.
-    if (!isGitIgnored(relPath, mainPath) || isGitTracked(relPath, mainPath)) {
-      result.skipped.push(relPath)
-      continue
-    }
-
-    const mainFile = path.resolve(mainPath, relPath)
-    const worktreeFile = path.resolve(worktreePath, relPath)
-    const snapshotFile = getSnapshotFilePath(slug, relPath)
-
-    // Main deleted the file after snapshot: respect main and do not recreate.
-    if (!isExistingFile(mainFile)) {
-      result.skipped.push(relPath)
-      continue
-    }
-
-    // Worktree deleted the file: skip and let user resolve intent manually.
-    if (!isExistingFile(worktreeFile)) {
-      result.skipped.push(relPath)
-      continue
-    }
-
-    // Snapshot missing/corrupt for this file means no safe merge base.
-    if (!snapshotFile || !isExistingFile(snapshotFile)) {
-      result.skipped.push(relPath)
-      continue
-    }
-
-    const baseHash = base.hash
-    const mainHash = hashFile(mainFile)
-    const worktreeHash = hashFile(worktreeFile)
-
-    if (baseHash === mainHash && baseHash === worktreeHash) {
-      result.skipped.push(relPath)
-      continue
-    }
-
-    if (baseHash === mainHash) {
-      copyFileToMain(worktreeFile, mainFile)
-      result.copied.push(relPath)
-      continue
-    }
-
-    if (baseHash === worktreeHash || mainHash === worktreeHash) {
-      result.skipped.push(relPath)
-      continue
-    }
-
-    if (isBinaryFile(mainFile) || isBinaryFile(worktreeFile) || isBinaryFile(snapshotFile)) {
-      result.binarySkipped.push(relPath)
-      continue
-    }
-
-    const hasConflicts = runGitMergeFile(mainFile, snapshotFile, worktreeFile, manifest.branch)
-    if (hasConflicts) {
-      result.conflicts.push(relPath)
-    } else {
-      result.merged.push(relPath)
-    }
+    processSnapshotTrackedFile(
+      result,
+      relPath,
+      worktreePath,
+      mainPath,
+      slug,
+      manifest.branch,
+      base.hash
+    )
   }
 
   const includeFiles = resolveIncludedFilePaths(mainPath, worktreePath)
   for (const relPath of includeFiles) {
     if (snapshotRelPathSet.has(relPath)) continue
-
-    if (!isGitIgnored(relPath, mainPath) || isGitTracked(relPath, mainPath)) {
-      result.skipped.push(relPath)
-      continue
-    }
-
-    const worktreeFile = path.resolve(worktreePath, relPath)
-    if (!isExistingFile(worktreeFile)) {
-      result.skipped.push(relPath)
-      continue
-    }
-
-    const mainFile = path.resolve(mainPath, relPath)
-    if (isExistingFile(mainFile) && hashFile(mainFile) === hashFile(worktreeFile)) {
-      result.skipped.push(relPath)
-      continue
-    }
-
-    copyFileToMain(worktreeFile, mainFile)
-    result.copied.push(relPath)
+    processNonSnapshotIncludeFile(result, relPath, worktreePath, mainPath)
   }
 
   return result
