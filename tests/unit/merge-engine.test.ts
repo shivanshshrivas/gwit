@@ -150,4 +150,48 @@ describe('mergeBackIncludedFiles', () => {
     expect(result.binarySkipped).toEqual(['.env'])
     expect(after.equals(before)).toBe(true)
   })
+
+  it('syncs tracked updates and new files from included directories', () => {
+    const caseDir = path.join(TMP, 'included_directory_new_file')
+    const mainPath = path.join(caseDir, 'main')
+    const worktreePath = path.join(caseDir, 'worktree')
+    const slug = 'included_directory_new_file_slug'
+
+    fs.mkdirSync(mainPath, { recursive: true })
+    fs.mkdirSync(worktreePath, { recursive: true })
+
+    runGit(mainPath, 'init')
+    runGit(mainPath, 'config user.email "test@gwit.test"')
+    runGit(mainPath, 'config user.name "gwit test"')
+
+    fs.writeFileSync(path.join(mainPath, '.gitignore'), '.private/docs/\n', 'utf-8')
+    fs.writeFileSync(path.join(mainPath, '.gwitinclude'), '.private/docs/\n', 'utf-8')
+    fs.writeFileSync(path.join(mainPath, 'README.md'), '# merge-engine include test\n', 'utf-8')
+    runGit(mainPath, 'add .gitignore .gwitinclude README.md')
+    runGit(mainPath, 'commit -m "init"')
+
+    const mainDocsDir = path.join(mainPath, '.private', 'docs')
+    const worktreeDocsDir = path.join(worktreePath, '.private', 'docs')
+    fs.mkdirSync(mainDocsDir, { recursive: true })
+    fs.mkdirSync(worktreeDocsDir, { recursive: true })
+
+    const mainSomeFile = path.join(mainDocsDir, 'somefile.md')
+    const worktreeSomeFile = path.join(worktreeDocsDir, 'somefile.md')
+    const worktreeNewFile = path.join(worktreeDocsDir, 'somefile1.md')
+    const mainNewFile = path.join(mainDocsDir, 'somefile1.md')
+
+    fs.writeFileSync(mainSomeFile, 'base-main\n', 'utf-8')
+    fs.copyFileSync(mainSomeFile, worktreeSomeFile)
+    createSnapshot(slug, 'feature/include-new-files', mainPath, ['.private/docs/'])
+
+    fs.writeFileSync(worktreeSomeFile, 'updated-in-worktree\n', 'utf-8')
+    fs.writeFileSync(worktreeNewFile, 'new-in-worktree\n', 'utf-8')
+
+    const result = mergeBackIncludedFiles(worktreePath, mainPath, slug)
+
+    expect(result.copied).toContain('.private/docs/somefile.md')
+    expect(result.copied).toContain('.private/docs/somefile1.md')
+    expect(fs.readFileSync(mainSomeFile, 'utf-8')).toBe('updated-in-worktree\n')
+    expect(fs.readFileSync(mainNewFile, 'utf-8')).toBe('new-in-worktree\n')
+  })
 })

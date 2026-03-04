@@ -105,6 +105,68 @@ function expandGlob(pattern: string, cwd: string): string[] {
   return files.filter((f) => minimatch(f, pattern, { dot: true }))
 }
 
+function normalizeRelPath(relPath: string): string {
+  return relPath.replace(/\\/g, '/')
+}
+
+/**
+ * Resolves a literal `.gwitinclude` entry into concrete file paths.
+ *
+ * - Rejects absolute and path-escaping entries
+ * - Expands directory entries recursively to file paths
+ * - Returns repo-relative paths using POSIX separators
+ *
+ * @param entry - A non-glob entry from `.gwitinclude`.
+ * @param sourcePath - Absolute source repo path used for resolution.
+ * @returns Concrete repo-relative file paths represented by the entry.
+ */
+function resolveLiteralEntryFiles(entry: string, sourcePath: string): string[] {
+  const entryPath = entry.replace(/\/$/, '')
+  if (entryPath.length === 0) return []
+
+  if (path.isAbsolute(entryPath)) return []
+
+  const sourceResolved = path.resolve(sourcePath)
+  const resolvedEntry = path.resolve(sourcePath, entryPath)
+  const relToSource = path.relative(sourceResolved, resolvedEntry)
+  if (relToSource.startsWith('..') || path.isAbsolute(relToSource)) return []
+
+  if (!fs.existsSync(resolvedEntry)) return []
+
+  const stat = fs.statSync(resolvedEntry)
+  if (stat.isFile()) {
+    return [normalizeRelPath(relToSource)]
+  }
+
+  if (!stat.isDirectory()) return []
+
+  const files: string[] = []
+  const stack = [resolvedEntry]
+
+  while (stack.length > 0) {
+    const current = stack.pop()
+    if (!current) continue
+
+    const entries = fs.readdirSync(current, { withFileTypes: true })
+    for (const dirent of entries) {
+      const childPath = path.join(current, dirent.name)
+      if (dirent.isDirectory()) {
+        stack.push(childPath)
+        continue
+      }
+
+      if (dirent.isFile()) {
+        const rel = path.relative(sourceResolved, childPath)
+        if (!rel.startsWith('..') && !path.isAbsolute(rel)) {
+          files.push(normalizeRelPath(rel))
+        }
+      }
+    }
+  }
+
+  return files
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
@@ -118,6 +180,40 @@ export function parseGwitInclude(mainPath: string): string[] {
   const includePath = path.join(mainPath, GWITINCLUDE_FILE)
   if (!fs.existsSync(includePath)) return []
   return _parseLines(fs.readFileSync(includePath, 'utf-8'))
+}
+
+/**
+ * Resolves current `.gwitinclude` entries into concrete repo-relative files.
+ *
+ * Uses `mainPath` to read `.gwitinclude`, and `sourcePath` as the file source
+ * for existence checks and glob expansion. Intended for reverse sync/merge
+ * workflows where include definitions live in main but file content may come
+ * from a linked worktree.
+ *
+ * @param mainPath - Absolute path to the main worktree (where `.gwitinclude` lives).
+ * @param sourcePath - Absolute path used as the source file root.
+ * @returns Sorted unique repo-relative file paths represented by `.gwitinclude`.
+ */
+export function resolveIncludedFilePaths(mainPath: string, sourcePath: string): string[] {
+  const rawEntries = parseGwitInclude(mainPath)
+  if (rawEntries.length === 0) return []
+
+  const files = new Set<string>()
+
+  for (const entry of rawEntries) {
+    if (isGlobPattern(entry)) {
+      for (const match of expandGlob(entry, sourcePath)) {
+        files.add(normalizeRelPath(match))
+      }
+      continue
+    }
+
+    for (const relPath of resolveLiteralEntryFiles(entry, sourcePath)) {
+      files.add(relPath)
+    }
+  }
+
+  return [...files].sort()
 }
 
 /**

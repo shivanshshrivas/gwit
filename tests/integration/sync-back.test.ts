@@ -49,7 +49,7 @@ const ORIG_CWD = process.cwd()
 
 let REPO_DIR: string
 
-beforeAll(() => {
+beforeAll(async () => {
   fs.mkdirSync(GWIT_DIR, { recursive: true })
 
   REPO_DIR = path.join(TMP, 'repo')
@@ -61,16 +61,23 @@ beforeAll(() => {
   git('git config user.name "gwit test"')
 
   fs.writeFileSync(path.join(REPO_DIR, 'README.md'), '# sync-back integration\n', 'utf-8')
-  fs.writeFileSync(path.join(REPO_DIR, '.gitignore'), '.env\n.local.env\n', 'utf-8')
-  fs.writeFileSync(path.join(REPO_DIR, '.gwitinclude'), '.env\n.local.env\n', 'utf-8')
+  fs.writeFileSync(path.join(REPO_DIR, '.gitignore'), '.env\n.local.env\n.private/docs/\n', 'utf-8')
+  fs.writeFileSync(
+    path.join(REPO_DIR, '.gwitinclude'),
+    '.env\n.local.env\n.private/docs/\n',
+    'utf-8'
+  )
   fs.writeFileSync(path.join(REPO_DIR, '.env'), 'A=1\nB=1\nC=1\n', 'utf-8')
   fs.writeFileSync(path.join(REPO_DIR, '.local.env'), 'TOKEN=base\n', 'utf-8')
+  fs.mkdirSync(path.join(REPO_DIR, '.private', 'docs'), { recursive: true })
+  fs.writeFileSync(path.join(REPO_DIR, '.private', 'docs', 'somefile.md'), 'base-doc\n', 'utf-8')
 
   git('git add README.md .gitignore .gwitinclude')
   git('git commit -m "init"')
 
   saveConfig({ editor: 'code', location: 'subdirectory', basePort: 22000 })
   process.chdir(REPO_DIR)
+  await createCommand(BRANCH, { b: true, commands: false, editor: false })
 })
 
 afterAll(async () => {
@@ -86,7 +93,6 @@ afterAll(async () => {
 
 describe('gwit sync --back', () => {
   it('creates a snapshot for copied .gwitinclude files', async () => {
-    await createCommand(BRANCH, { b: true, commands: false, editor: false })
     const manifestPath = path.join(SNAPSHOTS_DIR, SLUG, 'manifest.json')
     expect(fs.existsSync(manifestPath)).toBe(true)
   })
@@ -113,6 +119,20 @@ describe('gwit sync --back', () => {
     expect(conflicted).toContain('<<<<<<< main')
     expect(conflicted).toContain('=======')
     expect(conflicted).toContain('>>>>>>>')
+  })
+
+  it('syncs updates and new files in an included ignored directory', () => {
+    const worktreePath = path.join(REPO_DIR, '.worktrees', SLUG)
+    const mainDocsDir = path.join(REPO_DIR, '.private', 'docs')
+    const worktreeDocsDir = path.join(worktreePath, '.private', 'docs')
+
+    fs.writeFileSync(path.join(worktreeDocsDir, 'somefile.md'), 'updated-doc\n', 'utf-8')
+    fs.writeFileSync(path.join(worktreeDocsDir, 'somefile1.md'), 'new-doc\n', 'utf-8')
+
+    syncCommand(BRANCH, { back: true })
+
+    expect(fs.readFileSync(path.join(mainDocsDir, 'somefile.md'), 'utf-8')).toBe('updated-doc\n')
+    expect(fs.readFileSync(path.join(mainDocsDir, 'somefile1.md'), 'utf-8')).toBe('new-doc\n')
   })
 
   it('falls back to direct reverse copy when snapshot is missing', () => {
